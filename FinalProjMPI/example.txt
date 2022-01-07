@@ -1,0 +1,8 @@
+days: 5
+groups: 2
+subjects: 4
+classesPerSubject: 
+D1     D2      D3     D4    D5
+G1 G2
+1  2    3 2    4 1    3 2    1 4 
+2  1    1 2    2 1
