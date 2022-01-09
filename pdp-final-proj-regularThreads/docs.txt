@@ -1,0 +1,15 @@
+Benchmarks:
+
+threads    noOfGroups    subjects   classesPerSubject   time in ms
+1           2                2              2               1391
+2           2                2              2               1572
+
+1           3                3              1               3117
+2           3                3              1               1196
+
+1           2                4              1               1240
+2           2                4              1               1175
+4           2                4              1               1234
+
+1           3                3              2               95910
+2           3                3              2
