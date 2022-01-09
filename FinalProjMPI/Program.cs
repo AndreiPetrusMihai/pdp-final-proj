@@ -1,31 +1,31 @@
 ﻿using MPI;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 
 namespace FinalProjMPI
 {
-
-
-
     internal class Program
     {
         public static int weekDays = 5;
-        public static int noOfGroups = 2;
-        public static int noOfSubjects = 2;
+        public static int noOfGroups = 3;
+        public static int noOfSubjects = 3;
         public static int classesPerSubject = 2;
+
+        public static void printSolution(int[] sol)
+        {
+            for (int i = 0; i < sol.Length; i++)
+            {
+                Console.Write(sol[i]);
+            }
+            Console.WriteLine();
+        }
 
         public static bool VerifyTimeTable(int[] subjects)
         {
             int subjectIndex = 0;
-            Console.WriteLine("Subjects:");
-            Console.WriteLine("Subjects: " + subjects.Length);
-
-            for (int i = 0; i < subjects.Length; i++)
-            {
-                Console.Write(subjects[i] + " ");
-            }
-            Console.WriteLine();
-
+            //printSolution(subjects);
             try
             {
                 Dictionary<int, int[]> groupRegisteredSubjects = new Dictionary<int, int[]>();
@@ -87,40 +87,11 @@ namespace FinalProjMPI
             for (int subject = 1; subject <= numberOfSubjects; subject++)
             {
                 generatedSubjects[currentIndex] = subject;
-                //Console.WriteLine("Adding: " + subject);
                 if (currentIndex == totalSubjectsInWeek - 1)
                 {
                     if (VerifyTimeTable(generatedSubjects))
                     {
-                        Console.WriteLine("Found good solution");
-
-                        int subjectIndex = 0;
-                        while (subjectIndex < totalSubjectsInWeek)
-                        {
-                            for (int day = 1; day <= weekDays; day++)
-                            {
-                                for (int group = 1; group <= noOfGroups; group++)
-                                {
-                                    if (subjectIndex >= totalSubjectsInWeek) break;
-                                    Console.Write(generatedSubjects[subjectIndex] + " ");
-
-                                    subjectIndex++;
-                                }
-                                Console.Write("  ");
-                                if (subjectIndex >= totalSubjectsInWeek) break;
-
-                            }
-                            Console.WriteLine();
-
-
-                        }
-                        Console.WriteLine();
-                        Console.WriteLine();
-
-                    }
-                    else
-                    {
-                        //Console.WriteLine("Found bad solution");
+                        Communicator.world.Send<int[]>(generatedSubjects, 0, 0);
                     }
                 }
                 else
@@ -147,20 +118,15 @@ namespace FinalProjMPI
 
             for (int i = 0; i < processStartSubjects.Length; i++)
             {
-                Console.Write(processStartSubjects[i] + " ");
-            }
-            Console.WriteLine();
-            for (int i = 0; i < processStartSubjects.Length; i++)
-            {
-                Console.WriteLine("Starting with: " + processStartSubjects[i]);
-                //We loop through each designated start subject for this process
                 int[] generatedSubjects = new int[totalSubjectsInWeek];
 
-                generatedSubjects[0] = processStartSubjects[i];
-
-                STExhaustiveS(generatedSubjects, 1, totalSubjectsInWeek, subjects);
+                if (processStartSubjects[i] != 0)
+                {
+                    generatedSubjects[0] = processStartSubjects[i];
+                    STExhaustiveS(generatedSubjects, 1, totalSubjectsInWeek, subjects);
+                }
             }
-            Console.WriteLine();
+            Console.WriteLine("Process: " + Communicator.world.Rank + " finsihed all checks.");
 
         }
 
@@ -168,9 +134,16 @@ namespace FinalProjMPI
         {
             using (new MPI.Environment(ref args))
             {
+                if (Communicator.world.Size < 2)
+                {
+                    Console.WriteLine("There need to be more than 2 processes.");
+                    Communicator.world.Abort(0);
+                }
+
                 if (Communicator.world.Rank == 0)
                 {
                     Console.WriteLine("In master");
+                    DateTime start = DateTime.Now;
 
                     //main process
                     var weekDays = Program.weekDays;
@@ -178,7 +151,6 @@ namespace FinalProjMPI
                     var subjects = Program.noOfSubjects;
                     var classesPerSubject = Program.classesPerSubject;
                     var mpiProcesses = (Communicator.world.Size - 1) > subjects ? subjects : (Communicator.world.Size - 1);
-                    Console.WriteLine(mpiProcesses);
 
                     var subjectPerProcess = (subjects + mpiProcesses - 1) / mpiProcesses;
 
@@ -210,13 +182,13 @@ namespace FinalProjMPI
                         Communicator.world.Send<int[]>(processStartSubjects, processIndex, 0);
 
                     }
+                    Console.WriteLine("Waiting for solution");
+                    int totalSubjectsInWeek = groups * subjects * classesPerSubject;
+                    int[] generatedSolution = new int[totalSubjectsInWeek];
+                    generatedSolution = Communicator.world.Receive<int[]>(Communicator.anySource, 0);
 
 
-                    for (int processIndex = 1; processIndex < mpiProcesses; processIndex++)
-                    {
-
-
-                    }
+                    saveSolution(generatedSolution, start).ContinueWith((res) => { Communicator.world.Abort(0); });
 
                 }
                 else
@@ -224,6 +196,52 @@ namespace FinalProjMPI
                     STChild();
                 }
             }
+        }
+
+        public static Task saveSolution(int[] solution, DateTime start)
+        {
+
+            string output = (DateTime.Now - start).Milliseconds.ToString() + "ms\n\n";
+            for (int day = 1; day <= weekDays; day++)
+            {
+                output += ("D" + day.ToString()).PadLeft(noOfGroups * 3, ' ');
+                output += "    ";
+
+            }
+            output += "\n";
+            for (int day = 1; day <= weekDays; day++)
+            {
+                for (int group = 1; group <= noOfGroups; group++)
+                {
+                    output += ("G" + group.ToString()).PadLeft(3, ' ');
+                }
+                output += "    ";
+
+            }
+            output += "\n";
+            int subjectIndex = 0;
+
+
+            while (subjectIndex < solution.Length)
+            {
+                for (int day = 1; day <= weekDays; day++)
+                {
+                    for (int group = 1; group <= noOfGroups; group++)
+                    {
+
+                        if (subjectIndex >= solution.Length) break;
+
+                        output += solution[subjectIndex].ToString().PadLeft(3, ' ');
+                        subjectIndex++;
+                    }
+                    if (subjectIndex >= solution.Length) break;
+                    output += "    ";
+
+                }
+                output += "\n";
+            }
+            Console.WriteLine(output);
+            return File.WriteAllTextAsync("./timetable.out", output);
         }
     }
 }

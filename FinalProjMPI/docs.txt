@@ -1,0 +1,71 @@
+﻿
+The problem:
+Generate a school timetable through exhaustive search:
+
+Parallel strategy: Start multiple processes which differ in the starting subject in each week.
+
+
+The program will be run in the following way:
+
+Go to the .exe file and write and after installing msmpi run the following command:
+build the project: ctrl+shift+B
+mpiexec -n <number-of-threads> FinalProjMPI.exe 
+
+
+The program will save the result timetable into a file together with the execution time. Once a solution is found,
+the program will abort, thus shutting down all the processes.
+
+The result representation:
+We generate an array of n integers j. An integer j represents the subject id. So, in other words, 0<j<=noOfSubjects.
+We can control 3 input variables: noOfSubjects, noOfGroups and classesPerSubject. With these 3, we compute n the following way:
+n = noOfSubjects * classesPerSubject * groups
+
+We can also control the number of days in a schoolweek, but this will be left on 5.
+
+The way we interpret a potential solution:
+
+The exhausitve search will generate us a bunch of sequences of length n. It is up to us to interpret the result and build the timetable.
+The algorithm works the following way.
+
+An outer loop, taking the days, with an inner loop covering the groups. This way we check on a hour basis each day, and then go to the next hour and recheck everything.
+We need to make sure of two things:
+-each group has the required amount of classes for each subject
+-a class for a subject can't appear at the same hour in a day for 2 or mroe groups
+We keep track of these conditions using some dictionaries for efficienty. In the verify function, we only check that no subject has more than classesPerSubject classes. 
+If this never happens (everithing is valid), it is guaranteed that the classes were distributed properly.
+
+
+An example representation of a generated timetable:
+weekDays: 5
+noOfGroups: 3
+subjects: 4
+classesPerSubject:1
+noOfClassesPerWeek = noOfSubjects * classesPerSubject * groups = 3*4*1 = 12
+
+       D1           D2           D3           D4           D5    
+ G1 G2 G3     G1 G2 G3     G1 G2 G3     G1 G2 G3     G1 G2 G3    
+  1  2  3      2  1  4      3  4  1      4  3  2
+
+We can see that this respects all the rules
+
+Benchmarks: 
+
+mpi workers		groups		subjects		classesPerSubject		time in ms
+1               3           3               1                       33ms
+2               3           3               1                       100ms
+
+1               2           4               1                       33ms
+2               2           4               1                       100ms
+4               2           4               1                       150ms
+
+1               2           2               2                       30ms
+2               2           2               2                       100ms
+
+1               3           3               2                       424ms
+2               3           3               2                       883ms
+
+Conclusion: The true advantages of parallel programming won't really be seen in this problem.
+The order of the subjects doesn'treally matter(subject one could be replaced by 2 and 2 by one) for 
+a valid solution so splitting the program into different starting points won't benefit us.
+The first program will almost always find the first solution. Ex; 123 231 321 just as valid as 
+                                                                  231 321 213
